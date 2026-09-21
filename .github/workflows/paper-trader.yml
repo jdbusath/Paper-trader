@@ -1,37 +1,27 @@
 name: Polymarket Paper Trader
-
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/10 * * * *"
-
+    - cron: "*/30 * * * *"
 permissions:
   contents: write
-
 jobs:
-  scan:
+  paper-trade:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
+      - run: pip install -r requirements.txt
       - name: Run paper trader
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: python paper_trader.py
-
-      - name: Upload scan artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: paper-trader-scan
-          path: |
-            latest_scan.csv
-            latest_summary.json
-            paper_trader.db
-          if-no-files-found: warn
+      - name: Save state
+        run: |
+          git config user.name "paper-trader-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add state.json trades.csv paper_trader.db
+          git diff --cached --quiet || git commit -m "Update paper trading state"
+          git push
