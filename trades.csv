@@ -1,2 +1,5 @@
 id,created_at,market_id,question,side,entry,fair,edge,size,status,pnl,settled_at
 1,2026-09-21T22:04:04.821217+00:00,560317,"Putin out as President of Russia by December 31, 2026?",YES,0.038,0.15,0.11199999999999999,2.91060291060291,OPEN,,
+2,2026-09-23T12:41:52.705913+00:00,561229,Will JD Vance win the 2028 US Presidential Election?,NO,0.7935,0.88,0.08650000000000002,2.825363825363825,OPEN,,
+3,2026-09-23T12:41:52.706179+00:00,559652,Will Gavin Newsom win the 2028 Democratic presidential nomination?,NO,0.8685,0.95,0.0814999999999999,2.6558419958419957,OPEN,,
+4,2026-09-23T12:41:52.706201+00:00,559661,Will Jon Ossoff win the 2028 Democratic presidential nomination?,NO,0.8435,0.9299999999999999,0.08649999999999991,2.4964914760914763,OPEN,,
