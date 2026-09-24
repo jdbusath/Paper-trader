@@ -1,10 +1,12 @@
 import csv, json, os, sqlite3
 from datetime import datetime, timezone
 import requests
+
 GAMMA="https://gamma-api.polymarket.com/markets"
 OR_URL="https://openrouter.ai/api/v1/chat/completions"
 DB="paper_trader.db"; STATE="state.json"; TRADES="trades.csv"
 START=float(os.getenv("STARTING_BANKROLL","50")); MIN_EDGE=float(os.getenv("MIN_EDGE","0.08")); MAX_RISK=float(os.getenv("MAX_RISK_PCT","0.06")); MAX_OPEN=int(os.getenv("MAX_OPEN_POSITIONS","5")); MIN_LIQ=float(os.getenv("MIN_LIQUIDITY","5000")); MODEL=os.getenv("OPENROUTER_MODEL","openrouter/free")
+
 def now(): return datetime.now(timezone.utc).isoformat()
 def num(x):
     try:return float(x)
@@ -40,13 +42,34 @@ def candidates(ms):
         if p is None or p<=.02 or p>=.98 or (h is not None and h<2):continue
         a.append(m)
     a.sort(key=lambda m:num(m.get("liquidity")) or 0,reverse=True);return a[:20]
+
+def parse_ai_response(text):
+    """Safely parse JSON from an LLM response. A malformed response skips the cycle."""
+    if not isinstance(text,str): return {"markets":[]}
+    text=text.strip()
+    if text.startswith("```"):
+        text=text.replace("```json","",1).replace("```","",1).strip()
+    try:
+        data=json.loads(text)
+        return data if isinstance(data,dict) else {"markets":[]}
+    except json.JSONDecodeError:
+        start=text.find("{"); end=text.rfind("}")
+        if start>=0 and end>start:
+            try:
+                data=json.loads(text[start:end+1])
+                return data if isinstance(data,dict) else {"markets":[]}
+            except json.JSONDecodeError:
+                pass
+    print("AI returned malformed JSON; skipping this cycle instead of failing the workflow.")
+    return {"markets":[]}
+
 def ask_ai(ms):
     key=os.getenv("OPENROUTER_API_KEY")
     if not key:raise RuntimeError("OPENROUTER_API_KEY missing")
     data=[{"id":str(m.get("id")),"question":m.get("question",""),"description":(m.get("description") or "")[:1800],"resolution_source":m.get("resolutionSource",""),"prices":prices(m),"liquidity":num(m.get("liquidity")) or 0,"end":m.get("endDate"),"hours":hours(m)} for m in ms]
     prompt=("You are a cautious prediction-market paper trader. Use ONLY the supplied market information. Do not invent facts, news, sources, or certainty. Choose YES, NO, or SKIP. Only trade when you can justify a fair probability. A trade requires at least 0.08 edge. Return ONLY JSON with key markets, where each item has id, decision, fair_probability, confidence, reason. MARKETS:\n"+json.dumps(data,ensure_ascii=False))
     r=requests.post(OR_URL,headers={"Authorization":"Bearer "+key,"Content-Type":"application/json"},json={"model":MODEL,"messages":[{"role":"system","content":"Return only valid JSON."},{"role":"user","content":prompt}],"temperature":0.1},timeout=90);r.raise_for_status()
-    return json.loads(r.json()["choices"][0]["message"]["content"].strip())
+    return parse_ai_response(r.json()["choices"][0]["message"]["content"])
 def half_kelly(prob,price):
     if price<=0 or price>=1:return 0
     b=(1-price)/price;return max(0,(((b*prob)-(1-prob))/b)/2)
